@@ -6,6 +6,9 @@ tiktoken
 boto3
 openai
 mistralai
-docling
 asyncio
-spacy
+spacy==3.7.2
+pinecone
+scikit-learn
+chromadb
+Pillow
