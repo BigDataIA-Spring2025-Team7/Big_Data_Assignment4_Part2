@@ -1,0 +1,33 @@
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: fastapi_service
+    ports:
+      - "8000:8000"
+    networks:
+      - airflow_network
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./pdf_processing:/app/pdf_processing
+
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: streamlit_app
+    ports:
+      - "8501:8501"
+    networks:
+      - airflow_network
+    env_file:
+      - ./frontend/.env
+    depends_on:
+      - backend
+
+networks:
+  airflow_network:
+    external: true
+
