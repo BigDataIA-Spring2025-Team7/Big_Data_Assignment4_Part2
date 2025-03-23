@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 import boto3
 import os
@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import traceback
 # Import processing functions
 from pdf_processing.mistral import mistral_pdf_to_md
-from pdf_processing.docling import convert_pdf_to_markdown
+#from pdf_processing.docling_extract import convert_pdf_to_markdown
 from chunking.chunks import heading_based_split, semantic_split, recursive_split
 from embedding.pinecone import process_and_upload_to_pinecone
 from embedding.chromadb import process_and_upload_to_chromadb
@@ -20,6 +20,9 @@ from openai import OpenAI
 from fastapi import Request
 from embedding.chromadb import search_chunks as search_chroma_chunks
 from embedding.manual import search_manual_vectors
+import requests
+import asyncio
+import logging
 # Load .env variables
 load_dotenv()
 
@@ -81,31 +84,72 @@ def process_pdf_with_mistral(year: str, quarter: str):
     result = mistral_pdf_to_md(pdf_bytes, year, quarter)
     return result
 
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+
+from fastapi import HTTPException
+import requests
+import os
+import tempfile
+import traceback
+import logging
+
+logger = logging.getLogger(__name__)
+
 @app.post("/process_pdf_docling/{year}/{quarter}")
 def process_pdf_docling(year: str, quarter: str):
     s3_key = f"Raw_PDFs/{year}/{quarter}.pdf"
 
     try:
-        # Fetch PDF from S3
+        # Step 1: Download PDF from S3
+        logger.info(f"📥 Attempting to download PDF from S3: {s3_key}")
         response = s3_client.get_object(Bucket=AWS_BUCKET, Key=s3_key)
-        pdf_bytes = response["Body"].read()
+        logger.info("✅ Successfully fetched PDF stream from S3")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            tmp_file.write(response["Body"].read())
+            tmp_file_path = tmp_file.name
+
+        file_size = os.path.getsize(tmp_file_path) / 1e6
+        logger.info(f"✅ Saved PDF to temp file: {tmp_file_path} ({file_size:.2f} MB)")
+
     except Exception as e:
+        logger.error(f"❌ Failed to fetch PDF from S3: {e}")
         raise HTTPException(status_code=404, detail=f"❌ PDF not found in S3: {e}")
 
     try:
-        # Run Docling conversion
-        result = convert_pdf_to_markdown(pdf_bytes, year, quarter)
+        # Step 2: Forward to docling_service running on port 8001
+        docling_url = f"http://docling_service:8001/convert_docling/{year}/{quarter}"
+        logger.info(f"📤 Sending PDF to Docling service at {docling_url}")
+
+        with open(tmp_file_path, "rb") as f:
+            files = {"file": (f"{quarter}.pdf", f, "application/pdf")}
+            docling_response = requests.post(docling_url, files=files)
+
+        docling_response.raise_for_status()
+        logger.info(f"✅ Received successful response from Docling service.")
+
         return {
             "message": f"✅ Docling conversion successful for {year} {quarter}",
-            "markdown_path": result["markdown_s3_path"],
-            "preview_url": result["preview_url"],
-            "images_uploaded": result["images_uploaded"]
+            **docling_response.json()
         }
+
     except Exception as e:
-        import traceback
+        logger.error("❌ Exception occurred while sending to Docling:")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"❌ Docling conversion failed: {str(e)}")
-    
+        raise HTTPException(status_code=500, detail=f"❌ Docling service failed: {str(e)}")
+
+    finally:
+        # Clean up the temporary file
+        try:
+            if os.path.exists(tmp_file_path):
+                os.remove(tmp_file_path)
+                logger.info(f"🧹 Cleaned up temp file: {tmp_file_path}")
+        except Exception as cleanup_error:
+            logger.warning(f"⚠️ Failed to delete temp file: {tmp_file_path}. Error: {cleanup_error}")
+
 
 @app.post("/chunk_markdown")
 def chunk_markdown(payload: dict):
@@ -148,10 +192,16 @@ def trigger_pinecone(payload: dict):
         raise HTTPException(status_code=400, detail="Missing required parameters.")
 
     try:
+        print(f"🚀 Uploading to Pinecone — {year} {quarter} | {parser} | {strategy}")
         result = process_and_upload_to_pinecone(year, quarter, parser, strategy)
+        print(f"✅ Upload completed: {result}")
         return result
     except Exception as e:
+        import traceback
+        print("❌ Error uploading to Pinecone:")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
     
 
 
@@ -429,3 +479,39 @@ def generate_summary_manual(payload: dict):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+    
+AIRFLOW_DAG_ID = os.getenv("AIRFLOW_DAG_ID_Raw", "dag_rag_pipeline_triggered")
+AIRFLOW_BASE_URL = "http://airflow-webserver:8080/api/v1"
+AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
+AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
+
+@app.get("/check_dag_status/{dag_run_id}")
+async def check_dag_status(dag_run_id: str):
+    """
+    Poll the DAG run status from Airflow until it finishes or times out.
+    """
+    if not dag_run_id:
+        raise HTTPException(status_code=400, detail="dag_run_id is required.")
+
+    url = f"{AIRFLOW_BASE_URL}/dags/{AIRFLOW_DAG_ID}/dagRuns/{dag_run_id}"
+
+    max_retries = 50  # Retry for 1 minute (12 * 5s)
+    retries = 0
+
+    while retries < max_retries:
+        try:
+            response = requests.get(url, auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error contacting Airflow: {str(e)}")
+
+        if response.status_code == 200:
+            state = response.json().get("state")
+            if state in ["success", "failed"]:
+                return {"status": state}
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch DAG status")
+
+        retries += 1
+        await asyncio.sleep(5)
+
+    raise HTTPException(status_code=408, detail="DAG is still running after timeout.")

@@ -89,22 +89,46 @@ def search_chunks(parser, strategy, query, year, quarters, top_k=5):
 
 
 def process_and_upload_to_pinecone(year, quarter, parser, strategy):
+    print(f"📥 Loading markdown for: {year}/{quarter} | Parser: {parser}, Strategy: {strategy}")
+
+    # Step 1: Load Markdown
     markdown = load_markdown(year, quarter, parser)
     if not markdown:
         raise ValueError("❌ Markdown file could not be loaded from S3.")
 
-    if strategy == "heading":
-        chunks = heading_based_split(markdown)
-    elif strategy == "semantic":
-        chunks = semantic_split(markdown)
-    elif strategy == "recursive":
-        chunks = recursive_split(markdown)
-    else:
-        raise ValueError("❌ Invalid chunking strategy.")
+    # Step 2: Chunk Markdown
+    try:
+        if strategy == "heading":
+            chunks = heading_based_split(markdown)
+        elif strategy == "semantic":
+            chunks = semantic_split(markdown)
+        elif strategy == "recursive":
+            chunks = recursive_split(markdown)
+        else:
+            raise ValueError("❌ Invalid chunking strategy.")
+    except Exception as e:
+        print("❌ Error while chunking:", e)
+        raise ValueError(f"Error during chunking: {e}")
 
-    print(f"✅ Chunks created: {len(chunks)}")
-    upload_to_pinecone(parser, strategy, year, quarter, chunks)
+    print(f"✅ Total chunks created: {len(chunks)}")
+
+    
+    max_chars = 15000
+    chunks = [chunk[:max_chars] for chunk in chunks]
+
+    # Step 3: Upload to Pinecone
+    try:
+        print("🚀 Uploading chunks to Pinecone...")
+        upload_to_pinecone(parser, strategy, year, quarter, chunks)
+        print("✅ Upload to Pinecone successful.")
+    except Exception as e:
+        print("❌ Pinecone upload failed:")
+        import traceback
+        traceback.print_exc()
+        raise ValueError(f"Pinecone upload error: {e}")
+
     return {"status": "success", "chunks_uploaded": len(chunks)}
+
 
 
 
