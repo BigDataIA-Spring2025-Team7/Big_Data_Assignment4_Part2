@@ -141,6 +141,9 @@ Initially, the Streamlit interface had too many options in a single column, and 
 
 * Easily test RAG logic with Swagger UI
 
+**Codelabs Link** : https://codelabs-preview.appspot.com/?file_id=1BpU-AyUBABAziM_lYuxOj-JaInIaaq86dNB_8TkBjqg#0
+
+
 # APPLICATION WORKFLOW 
 
 1. **User Uploads a PDF or Selects an Existing Markdown**  
