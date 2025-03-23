@@ -18,7 +18,6 @@ tokenizer = tiktoken.encoding_for_model("text-embedding-3-small")
 # Constants
 CHUNK_LIMIT = 8192
 SAFE_LIMIT = 2000
-OVERLAP_SIZE = 200
 
 def token_count(text):
     return len(tokenizer.encode(text))
@@ -56,28 +55,33 @@ def semantic_split(md_text, max_sents=5):
         grouped.extend(break_into_subchunks(" ".join(buffer), max_tokens=CHUNK_LIMIT // 2))
     return grouped
 
-def overlapping_split(md_text, window=SAFE_LIMIT, overlap=OVERLAP_SIZE):
-    tokens = tokenizer.encode(md_text)
-    chunks = []
+def recursive_split(text, max_tokens=CHUNK_LIMIT):
+    if token_count(text) <= max_tokens:
+        return [text]
 
-    idx = 0
-    while idx < len(tokens):
-        end = min(idx + window, len(tokens))
-        piece = tokenizer.decode(tokens[idx:end])
+    for splitter in ["\n\n", "\n", ". "]:
+        parts = text.split(splitter)
+        if len(parts) == 1:
+            continue
 
-        if token_count(piece) > CHUNK_LIMIT // 2:
-            chunks.extend(break_into_subchunks(piece, max_tokens=CHUNK_LIMIT // 2))
-        else:
-            chunks.append(piece)
+        chunks, current = [], ""
+        for part in parts:
+            candidate = (current + splitter + part).strip() if current else part.strip()
+            if token_count(candidate) <= max_tokens:
+                current = candidate
+            else:
+                if current:
+                    chunks.extend(recursive_split(current, max_tokens))
+                current = part.strip()
+        if current:
+            chunks.extend(recursive_split(current, max_tokens))
+        return chunks
 
-        if end == len(tokens):
-            break
-        idx += window - overlap
-    return chunks
+    return break_into_subchunks(text, max_tokens=max_tokens)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Choose a chunking strategy.")
-    parser.add_argument("--strategy", choices=["heading", "semantic", "sliding"], required=True, help="Choose chunking strategy.")
+    parser.add_argument("--strategy", choices=["heading", "semantic", "recursive"], required=True, help="Choose chunking strategy.")
     parser.add_argument("--input", default="chunks/Q1 (1).md", help="Path to Markdown input file.")
     parser.add_argument("--preview", action="store_true", help="Print chunks to console.")
     parser.add_argument("--save", action="store_true", help="Save chunks to .txt and .json")
@@ -99,8 +103,8 @@ if __name__ == "__main__":
         chunks = heading_based_split(markdown_data)
     elif strategy == "semantic":
         chunks = semantic_split(markdown_data)
-    elif strategy == "sliding":
-        chunks = overlapping_split(markdown_data)
+    elif strategy == "recursive":
+        chunks = recursive_split(markdown_data)
     else:
         raise ValueError("❌ Invalid strategy selected.")
 
@@ -126,4 +130,3 @@ if __name__ == "__main__":
         print(f"\n💾 Saved chunks to:\n- {txt_path}\n- {json_path}")
     
     print(f"\n🔢 Final Count: {len(chunks)} chunks generated using '{strategy}' strategy.")
-
