@@ -3,3 +3,5 @@
 logs/
 __pycache__
 .DS_Store
+backend/mistral_conversion.log
+docling_conversion.log
