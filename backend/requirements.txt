@@ -8,3 +8,4 @@ openai
 mistralai
 docling
 asyncio
+spacy

@@ -6,3 +6,4 @@ asyncio
 pinecone
 chromadb
 spacy
+scikit-learn
