@@ -68,6 +68,7 @@ services:
       - airflow_network
 
   airflow-webserver:
+    container_name: airflow_webserver
     build:
       context: .
       dockerfile: Dockerfile
