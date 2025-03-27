@@ -1,9 +1,7 @@
 selenium
 webdriver-manager
 mistralai
-docling
 asyncio
 pinecone
-chromadb
 spacy
 scikit-learn
