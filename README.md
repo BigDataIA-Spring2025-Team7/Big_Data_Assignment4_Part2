@@ -116,7 +116,7 @@ Retrieval performance degraded when querying across all documents. To fix this, 
 
 # WALKTHROUGH OF THE APPLICATION
 
-**Frontend**: [http://34.46.62.44:8502](http://34.46.62.44:8502)
+**Frontend**: [[http://34.46.62.44:8502](http://34.46.62.44:8502)](http://198.211.105.31:8501/)
 
 * Upload your PDF or choose a pre-parsed markdown
 
@@ -128,14 +128,15 @@ Retrieval performance degraded when querying across all documents. To fix this, 
 
 * Ask your question and view answer
 
-**Backend API (FastAPI)**: [http://0.0.0.0:8000/docs](http://0.0.0.0:8000/docs)
+**Backend API (FastAPI)**: http://198.211.105.31:8000/docs
 
 * Try endpoints for parsing, chunking, answering questions
 
 * Easily test RAG logic with Swagger UI
 
-**Codelabs Link** : https://codelabs-preview.appspot.com/?file_id=1BpU-AyUBABAziM_lYuxOj-JaInIaaq86dNB_8TkBjqg#0
+airflow: http://198.211.105.31:8082
 
+**Codelabs Link** : https://codelabs-preview.appspot.com/?file_id=1BpU-AyUBABAziM_lYuxOj-JaInIaaq86dNB_8TkBjqg#0
 
 # APPLICATION WORKFLOW 
 
