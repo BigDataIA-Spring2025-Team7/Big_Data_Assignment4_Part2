@@ -116,7 +116,7 @@ Retrieval performance degraded when querying across all documents. To fix this, 
 
 # WALKTHROUGH OF THE APPLICATION
 
-**Frontend**: [[http://34.46.62.44:8502](http://34.46.62.44:8502)](http://198.211.105.31:8501/)
+**Frontend**: http://198.211.105.31:8501/
 
 * Upload your PDF or choose a pre-parsed markdown
 
