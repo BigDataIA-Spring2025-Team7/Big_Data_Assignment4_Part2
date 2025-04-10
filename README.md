@@ -274,7 +274,7 @@ WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AN
 For this project, we used AI tools like ChatGPT, DeepSeek, and Claude to enhance various aspects of development debugging code, optimizing SQL queries, and generating explanations for complex concepts. These tools were leveraged to improve clarity, efficiency, and accuracy in our work, but all final decisions, implementations, and analyses were conducted by us.
 
 Contributions
-Vemana Anil Kumar - 50%
-Ashwin Badamikar - 17%
-Madhura Adadande - 33%
+Vemana Anil Kumar - 50%<br>
+Ashwin Badamikar - 20%<br>
+Madhura Adadande - 30%<br>
 WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK
